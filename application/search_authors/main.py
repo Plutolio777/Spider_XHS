@@ -61,7 +61,21 @@ def main():
     )
 
     keywords = [kw.strip() for kw in args.keywords.split(",") if kw.strip()]
-    sort_order = [int(s.strip()) for s in args.sort_order.split(",") if s.strip()]
+    if not keywords:
+        logger.error("未提供有效关键词")
+        sys.exit(1)
+
+    sort_values = []
+    for s in args.sort_order.split(","):
+        s = s.strip()
+        if not s:
+            continue
+        try:
+            sort_values.append(int(s))
+        except ValueError:
+            logger.error(f"无效排序值: '{s}'，排序值必须是数字，0~4")
+            sys.exit(1)
+    sort_order = sort_values
 
     # 验证排序参数
     for s in sort_order:
@@ -69,13 +83,21 @@ def main():
             logger.error(f"无效排序值: {s}，有效值为 0~4")
             sys.exit(1)
 
+    if args.target <= 0:
+        logger.error("目标数量必须大于 0")
+        sys.exit(1)
+
     collector = SearchAuthorsCollector(
         keywords=keywords,
         target=args.target,
         sort_order=sort_order,
         resume=args.resume,
     )
-    collector.run()
+    try:
+        collector.run()
+    except Exception as e:
+        logger.exception(f"运行异常: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
