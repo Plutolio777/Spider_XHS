@@ -3,12 +3,11 @@
 Search Authors 采集器核心逻辑
 """
 import json
-import os
 import time
 import random
 import signal
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
@@ -71,6 +70,9 @@ class SearchAuthorsCollector:
         # 控制标记
         self._stop = False
         self._strategy_exhausted = {"main": False, "backup_a": False, "backup_b": False}
+
+        # O(1) 作者去重集合
+        self.collected_user_ids = set()
 
         # 注册信号处理
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -140,6 +142,7 @@ class SearchAuthorsCollector:
         self.current_note_type = NOTE_TYPE_ALL
         self.current_year_min = 2026
         self._run_sort_keyword_loop()
+        self._strategy_exhausted["main"] = True
 
     def _run_backup_a_strategy(self):
         """备用A：细分笔记类型 × 2026年"""
@@ -165,6 +168,7 @@ class SearchAuthorsCollector:
             self.current_note_type = note_type
             logger.info(f"备用B: 放宽年份至2025, 笔记类型 {note_type}")
             self._run_sort_keyword_loop()
+        self._strategy_exhausted["backup_b"] = True
 
     def _run_sort_keyword_loop(self):
         """排序轮转 × 关键词轮转 × 翻页"""
@@ -216,7 +220,7 @@ class SearchAuthorsCollector:
 
         # 重置排序索引
         self.sort_idx = 0
-        self._strategy_exhausted[self.current_strategy] = True
+        # strategy_exhausted 标记由各策略方法自行设置
 
     # ──────────── 处理页面结果 ────────────
 
@@ -247,6 +251,10 @@ class SearchAuthorsCollector:
             # 标记已处理
             self.processed_notes.add(note_id)
             self.total_notes_processed += 1
+
+            # 每处理 50 条笔记保存一次 processed_notes
+            if self.total_notes_processed % 50 == 0:
+                self._save_processed_notes()
 
             # 检查作者是否已收集
             if self._is_author_collected(user_id):
@@ -319,6 +327,7 @@ class SearchAuthorsCollector:
 
         # 实时保存
         self.authors.append(author_record)
+        self.collected_user_ids.add(user_id)
         self.collected_count += 1
         self._append_author_line(author_record)
         self._append_processed_note(note_id)
@@ -411,6 +420,7 @@ class SearchAuthorsCollector:
         self.current_note_type = NOTE_TYPE_ALL
         self.current_year_min = 2026
         self._strategy_exhausted = {"main": False, "backup_a": False, "backup_b": False}
+        self.collected_user_ids = set()
 
         # 创建空状态文件
         self._save_processed_notes()
@@ -449,6 +459,9 @@ class SearchAuthorsCollector:
                     if line:
                         self.authors.append(json.loads(line))
 
+        # 从已加载的作者中重建 O(1) 去重集合
+        self.collected_user_ids = {a.get("user_id") for a in self.authors}
+
     def _save_checkpoint(self):
         """保存断点"""
         cp = {
@@ -484,11 +497,8 @@ class SearchAuthorsCollector:
     # ──────────── 辅助方法 ────────────
 
     def _is_author_collected(self, user_id):
-        """检查作者是否已收集"""
-        for author in self.authors:
-            if author.get("user_id") == user_id:
-                return True
-        return False
+        """检查作者是否已收集（O(1)）"""
+        return user_id in self.collected_user_ids
 
     def _random_sleep(self, min_s, max_s):
         """随机延迟"""
@@ -530,6 +540,13 @@ class SearchAuthorsCollector:
 
         for author in self.authors:
             gender_str = "男" if author.get("gender") == 0 else ("女" if author.get("gender") == 1 else "未知")
+            # 格式化采集时间
+            collected_ts = author.get("collected_at", 0)
+            if collected_ts:
+                dt = datetime.fromtimestamp(collected_ts / 1000)
+                collected_at_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                collected_at_str = ""
             row = [
                 author.get("user_id", ""),
                 author.get("nickname", ""),
@@ -548,7 +565,7 @@ class SearchAuthorsCollector:
                 author.get("match_note_url", ""),
                 author.get("match_keyword", ""),
                 author.get("match_sort_type", ""),
-                author.get("collected_at", ""),
+                collected_at_str,
             ]
             ws.append(row)
 
@@ -559,7 +576,10 @@ class SearchAuthorsCollector:
         """打印汇总"""
         elapsed = time.time() - self.start_time
         logger.info("=" * 50)
-        logger.info("采集完成汇总")
+        if self._stop:
+            logger.info("采集中断汇总")
+        else:
+            logger.info("采集完成汇总")
         logger.info(f"  收集作者: {self.collected_count}/{self.target}")
         logger.info(f"  处理笔记: {self.total_notes_processed}")
         logger.info(f"  耗时: {elapsed:.0f}秒 ({elapsed/60:.1f}分钟)")
