@@ -168,7 +168,40 @@ best_kols = your_ai_agent(kol_list, brand_profile)
 
 ---
 
-## 🎨 爬虫效果图
+## 🧩 Application 层 — 即用型业务脚本
+
+基于 Spider_XHS 底层 API 封装的可直接运行的业务脚本，聚焦具体运营场景。
+
+### search_authors — 关键词搜索 → 获取作者信息
+
+通过关键词搜索小红书笔记，提取发布者的完整账号信息。支持多层搜索策略、实时保存/断点恢复、风控规避。
+
+```
+用法:
+    python -m application.search_authors.main --keywords 独立游戏,游戏开发 --target 1000
+    python -m application.search_authors.main --keywords 榴莲 --target 500 --sort-order 0,1,4 --resume
+```
+
+**参数说明：**
+
+| 参数 | 说明 |
+| :--- | :---- |
+| `--keywords / -k` | 搜索关键词，多个用逗号分隔 |
+| `--target / -t` | 目标作者数量（默认 1000） |
+| `--sort-order / -s` | 排序轮转顺序，默认 `0,1,2,3,4`（综合→最新→最多点赞→最多评论→最多收藏） |
+| `--resume / -r` | 从上次断点恢复（自动检测 data/ 目录） |
+
+**搜索策略（自动递进）：**
+
+1. **主策略** — 排序轮转 × 关键词轮转，不限笔记类型，过滤 2026 年
+2. **备用A** — 细分视频/图文笔记类型，重新轮转
+3. **备用B** — 放宽年份到 2025~2026，重新轮转
+
+**特性：**
+- 实时保存：每收集到一位作者立即写入 `data/authors.jsonl`
+- 断点恢复：自动记录搜索位置和已处理笔记，支持 `Ctrl+C` 优雅退出
+- 风控：随机请求间隔、失败重试、每 50 个作者额外休息
+- 输出：终端实时进度 + `output/search_authors_YYYY-MM-DD.xlsx`
 
 ### 处理后的所有用户
 ![image](https://github.com/cv-cat/Spider_XHS/assets/94289429/00902dbd-4da1-45bc-90bb-19f5856a04ad)
@@ -243,6 +276,10 @@ Spider_XHS/
 │   ├── xhs_creator_login_apis.py    # 创作者平台登录
 │   ├── xhs_pugongying_apis.py       # 蒲公英平台API（KOL数据）
 │   └── xhs_qianfan_apis.py          # 千帆平台API（分销商数据）
+├── application/                     # 应用层小程序（基于 API 的业务脚本）
+│   └── search_authors/              # 关键词搜索→获取作者信息
+│       ├── core.py                  # 采集器核心逻辑
+│       └── main.py                  # CLI 入口
 ├── xhs_utils/
 │   ├── common_util.py               # 初始化工具（读取.env配置）
 │   ├── cookie_util.py               # Cookie解析
