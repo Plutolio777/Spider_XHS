@@ -129,9 +129,9 @@ class SearchAuthorsCollector:
             strategy_func()
 
         if self.collected_count >= self.target:
-            logger.info(f"🎯 达到目标数量: {self.target}")
+            logger.info(f"[目标达成] 达到目标数量: {self.target}")
         elif self._stop:
-            logger.info("⏹️ 用户中断")
+            logger.info("[中断] 用户中断")
         else:
             logger.warning(f"所有策略已耗尽，共收集 {self.collected_count}/{self.target} 个作者")
 
