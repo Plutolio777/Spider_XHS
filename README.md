@@ -178,8 +178,24 @@ best_kols = your_ai_agent(kol_list, brand_profile)
 
 ```
 用法:
+    # 使用默认配置运行（默认关键词：独立游戏，目标：1000）
+    python -m application.search_authors.main
+
+    # 断点恢复
+    python -m application.search_authors.main --resume
+
+    # 临时覆盖默认配置
     python -m application.search_authors.main --keywords 独立游戏,游戏开发 --target 1000
-    python -m application.search_authors.main --keywords 榴莲 --target 500 --sort-order 0,1,4 --resume
+    python -m application.search_authors.main --keywords 榴莲 --target 500 --sort-order 0,1,4
+```
+
+默认配置在 `application/search_authors/config.py` 中，可直接修改：
+
+```python
+KEYWORDS = "独立游戏"
+TARGET = 1000
+SORT_ORDER = "0,1,2,3,4"
+RESUME = False
 ```
 
 **参数说明：**

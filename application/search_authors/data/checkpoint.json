@@ -1,0 +1,16 @@
+{
+  "sort_idx": 0,
+  "kw_idx": 2,
+  "page": 25,
+  "current_strategy": "main",
+  "current_note_type": 0,
+  "current_year_min": 2026,
+  "collected_count": 298,
+  "total_notes_processed": 2043,
+  "strategy_exhausted": {
+    "main": false,
+    "backup_a": false,
+    "backup_b": false
+  },
+  "updated_at": 1782403196343
+}

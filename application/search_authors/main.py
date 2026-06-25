@@ -3,47 +3,71 @@
 Search Authors CLI 入口
 
 用法:
+    # 直接运行，使用默认配置
+    python -m application.search_authors.main
+
+    # 断点恢复
+    python -m application.search_authors.main --resume
+
+    # 自定义参数
     python -m application.search_authors.main --keywords 独立游戏,游戏开发 --target 1000
-    python -m application.search_authors.main --keywords 独立游戏 --target 1000 --resume
     python -m application.search_authors.main --keywords 榴莲 --target 500 --sort-order 0,1,4
 """
 import argparse
+import os
 import sys
+from pathlib import Path
 
 from loguru import logger
 
-from .core import SearchAuthorsCollector
+# 兼容两种运行方式：
+# 1. python -m application.search_authors.main
+# 2. 直接在 IDE 中运行 application/search_authors/main.py
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+os.chdir(PROJECT_ROOT)
+
+try:
+    from .config import KEYWORDS, TARGET, SORT_ORDER, RESUME
+    from .core import SearchAuthorsCollector
+except ImportError:
+    from application.search_authors.config import KEYWORDS, TARGET, SORT_ORDER, RESUME
+    from application.search_authors.core import SearchAuthorsCollector
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="搜索小红书笔记 → 获取作者信息",
+        description="搜索小红书笔记 -> 获取作者信息",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  %(prog)s                          # 使用默认配置运行
+  %(prog)s --resume                 # 断点恢复
   %(prog)s --keywords 独立游戏,游戏开发 --target 1000
-  %(prog)s --keywords 榴莲 --target 500 --sort-order 0,1,4 --resume
+  %(prog)s --keywords 榴莲 --target 500 --sort-order 0,1,4
         """,
     )
     parser.add_argument(
         "--keywords", "-k",
-        required=True,
-        help="搜索关键词，多个用逗号分隔，如: 独立游戏,游戏开发",
+        default=KEYWORDS,
+        help=f"搜索关键词，多个用逗号分隔 (默认: {KEYWORDS})",
     )
     parser.add_argument(
         "--target", "-t",
         type=int,
-        default=1000,
-        help="目标作者数量 (默认: 1000)",
+        default=TARGET,
+        help=f"目标作者数量 (默认: {TARGET})",
     )
     parser.add_argument(
         "--sort-order", "-s",
-        help="排序轮转顺序，逗号分隔，0综合 1最新 2最多点赞 3最多评论 4最多收藏 (默认: 0,1,2,3,4)",
-        default="0,1,2,3,4",
+        default=SORT_ORDER,
+        help=f"排序轮转顺序，逗号分隔，0综合 1最新 2最多点赞 3最多评论 4最多收藏 (默认: {SORT_ORDER})",
     )
     parser.add_argument(
         "--resume", "-r",
         action="store_true",
+        default=RESUME,
         help="从上次断点恢复",
     )
     return parser.parse_args()
@@ -86,6 +110,8 @@ def main():
     if args.target <= 0:
         logger.error("目标数量必须大于 0")
         sys.exit(1)
+
+    logger.info(f"配置: keywords={keywords}, target={args.target}, sort_order={sort_order}, resume={args.resume}")
 
     collector = SearchAuthorsCollector(
         keywords=keywords,
